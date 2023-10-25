@@ -1,5 +1,33 @@
 import "./style.css";
 
+class MarkerLine {
+  private points: Array<{ x: number; y: number }> = [];
+
+  constructor(initialPosition: { x: number; y: number }) {
+    this.points.push(initialPosition);
+  }
+
+  drag(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    if (this.points.length < 2) {
+      return;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(this.points[0].x, this.points[0].y);
+
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i].x, this.points[i].y);
+    }
+
+    ctx.stroke();
+    ctx.closePath();
+  }
+}
+
 const app: HTMLDivElement = document.querySelector("#app")!;
 
 const gameName = "JSTN's game";
@@ -13,30 +41,29 @@ app.append(header);
 const canvas = document.createElement("canvas");
 canvas.width = 256;
 canvas.height = 256;
-
 canvas.classList.add("canvas-style");
-
 app.appendChild(canvas);
 
 const ctx = canvas.getContext("2d");
 
 let isDrawing = false;
-let drawingData: Array<Array<{ x: number; y: number }>> = [];
-let redoStack: Array<Array<{ x: number; y: number }>> = [];
+let displayList: Array<MarkerLine> = [];
+let undoStack: Array<MarkerLine> = [];
 
 canvas.addEventListener("mousedown", (e) => {
   isDrawing = true;
   const x = e.clientX - canvas.offsetLeft;
   const y = e.clientY - canvas.offsetTop;
-  drawingData.push([{ x, y }]);
-  clearRedoStack();
+  const line = new MarkerLine({ x, y });
+  displayList.push(line);
+  clearUndoStack();
 });
 
 canvas.addEventListener("mousemove", (e) => {
   if (!isDrawing) return;
   const x = e.clientX - canvas.offsetLeft;
   const y = e.clientY - canvas.offsetTop;
-  drawingData[drawingData.length - 1].push({ x, y });
+  displayList[displayList.length - 1].drag(x, y);
   const event = new Event("drawing-changed");
   canvas.dispatchEvent(event);
 });
@@ -53,33 +80,21 @@ const clearButton = document.createElement("button");
 clearButton.textContent = "Clear";
 clearButton.addEventListener("click", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawingData = [];
-  clearRedoStack();
+  displayList = [];
+  clearUndoStack();
   const event = new Event("drawing-changed");
   canvas.dispatchEvent(event);
 });
 
 app.appendChild(clearButton);
 
-canvas.addEventListener("drawing-changed", () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const line of drawingData) {
-    ctx.beginPath();
-    ctx.moveTo(line[0].x, line[0].y);
-    for (const point of line) {
-      ctx.lineTo(point.x, point.y);
-    }
-    ctx.stroke();
-    ctx.closePath();
-  }
-});
-
 const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
 undoButton.addEventListener("click", () => {
-  if (drawingData.length > 0) {
-    const lastLine = drawingData.pop();
-    redoStack.push(lastLine);
+  if (displayList.length > 0) {
+    // Pop the most recent element from the display list
+    const lastLine = displayList.pop();
+    undoStack.push(lastLine);
     const event = new Event("drawing-changed");
     canvas.dispatchEvent(event);
   }
@@ -90,9 +105,10 @@ app.appendChild(undoButton);
 const redoButton = document.createElement("button");
 redoButton.textContent = "Redo";
 redoButton.addEventListener("click", () => {
-  if (redoStack.length > 0) {
-    const lastLine = redoStack.pop();
-    drawingData.push(lastLine);
+  if (undoStack.length > 0) {
+    // Pop the most recent element from the redo stack
+    const lastLine = undoStack.pop();
+    displayList.push(lastLine);
     const event = new Event("drawing-changed");
     canvas.dispatchEvent(event);
   }
@@ -102,17 +118,11 @@ app.appendChild(redoButton);
 
 canvas.addEventListener("drawing-changed", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const line of drawingData) {
-    ctx.beginPath();
-    ctx.moveTo(line[0].x, line[0].y);
-    for (const point of line) {
-      ctx.lineTo(point.x, point.y);
-    }
-    ctx.stroke();
-    ctx.closePath();
+  for (const line of displayList) {
+    line.display(ctx);
   }
 });
 
-function clearRedoStack() {
-  redoStack = [];
+function clearUndoStack() {
+  undoStack = [];
 }
