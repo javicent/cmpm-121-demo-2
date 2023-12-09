@@ -1,5 +1,10 @@
 import "./style.css";
 
+const initialStickers = [
+  { x: 50, y: 50, emoji: "😊", size: 30 },
+  { x: 100, y: 100, emoji: "🌟", size: 40 },
+];
+
 class MarkerLine {
   private points: Array<{ x: number; y: number }> = [];
   private lineWidth: number;
@@ -57,6 +62,66 @@ class ToolPreview {
   }
 }
 
+class Sticker {
+  private x: number;
+  private y: number;
+  private emoji: string;
+  private size: number;
+
+  constructor(x: number, y: number, emoji: string, size: number) {
+    this.x = x;
+    this.y = y;
+    this.emoji = emoji;
+    this.size = size;
+  }
+
+  preview(ctx: CanvasRenderingContext2D) {
+    ctx.font = `${this.size}px Arial`;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillText(this.emoji, this.x, this.y);
+  }
+
+  apply(ctx: CanvasRenderingContext2D) {
+    ctx.font = `${this.size}px Arial`;
+    ctx.fillText(this.emoji, this.x, this.y);
+  }
+
+  updatePosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+  static createFromData(data) {
+    return new Sticker(data.x, data.y, data.emoji, data.size);
+  }
+}
+
+class StickerPreviewCommand {
+  private sticker: Sticker;
+  private ctx: CanvasRenderingContext2D;
+
+  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
+    this.sticker = sticker;
+    this.ctx = ctx;
+  }
+
+  execute() {
+    this.sticker.preview(this.ctx);
+  }
+}
+
+class StickerApplyCommand {
+  private sticker: Sticker;
+  private ctx: CanvasRenderingContext2D;
+
+  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
+    this.sticker = sticker;
+    this.ctx = ctx;
+  }
+
+  execute() {
+    this.sticker.apply(this.ctx);
+  }
+}
 const app: HTMLDivElement = document.querySelector("#app")!;
 document.title = "My game";
 
@@ -173,10 +238,8 @@ thickToolButton.addEventListener("click", () => {
 app.appendChild(thinToolButton);
 app.appendChild(thickToolButton);
 
-// Set the default tool style
 thinToolButton.classList.add("selectedTool");
 
-// Update the tool buttons' styles
 function updateToolButtonStyles() {
   thinToolButton.classList.remove("selectedTool");
   thickToolButton.classList.remove("selectedTool");
@@ -185,86 +248,38 @@ function updateToolButtonStyles() {
   } else {
     thickToolButton.classList.add("selectedTool");
   }
+
+  stickers.forEach((sticker, index) => {
+    const stickerButton = document.createElement("button");
+    stickerButton.textContent = `Sticker ${index + 1}`;
+    stickerButton.id = `sticker-${index}`;
+    stickerButton.addEventListener("click", () => {
+      selectedSticker = sticker;
+      updateToolButtonStyles();
+    });
+    app.appendChild(stickerButton);
+  });
 }
 
-// Add a listener for the "tool-moved" event to draw the tool preview
 canvas.addEventListener("tool-moved", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const line of displayList) {
     line.display(ctx);
   }
+  stickers.forEach((sticker) => {
+    sticker.preview(ctx);
+  });
   if (toolPreview) {
     toolPreview.draw(ctx);
   }
 });
 
 canvas.addEventListener("drawing-changed", () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const line of displayList) {
-    line.display(ctx);
-  }
+  updateToolButtonStyles();
 });
 
 function clearUndoStack() {
   undoStack = [];
-}
-
-class Sticker {
-  private x: number;
-  private y: number;
-  private emoji: string;
-  private size: number;
-
-  constructor(x: number, y: number, emoji: string, size: number) {
-    this.x = x;
-    this.y = y;
-    this.emoji = emoji;
-    this.size = size;
-  }
-
-  preview(ctx: CanvasRenderingContext2D) {
-    ctx.font = `${this.size}px Arial`;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillText(this.emoji, this.x, this.y);
-  }
-
-  apply(ctx: CanvasRenderingContext2D) {
-    ctx.font = `${this.size}px Arial`;
-    ctx.fillText(this.emoji, this.x, this.y);
-  }
-
-  updatePosition(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-  }
-}
-
-class StickerPreviewCommand {
-  private sticker: Sticker;
-  private ctx: CanvasRenderingContext2D;
-
-  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
-    this.sticker = sticker;
-    this.ctx = ctx;
-  }
-
-  execute() {
-    this.sticker.preview(this.ctx);
-  }
-}
-
-class StickerApplyCommand {
-  private sticker: Sticker;
-  private ctx: CanvasRenderingContext2D;
-
-  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
-    this.sticker = sticker;
-    this.ctx = ctx;
-  }
-
-  execute() {
-    this.sticker.apply(this.ctx);
-  }
 }
 
 const applyStickerButton = document.createElement("button");
