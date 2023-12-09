@@ -1,5 +1,8 @@
 import "./style.css";
 
+let thinLineWidth = 3;
+let thickLineWidth = 8;
+
 const initialStickers = [
   { x: 50, y: 50, emoji: "😊", size: 30 },
   { x: 100, y: 100, emoji: "🌟", size: 40 },
@@ -322,3 +325,13 @@ function exportDrawing() {
   a.download = "exported_drawing.png";
   a.click();
 }
+
+// Adjusted CSS for a nicer visual style
+canvas.classList.add("canvas-style");
+clearButton.classList.add("tool-button");
+undoButton.classList.add("tool-button");
+redoButton.classList.add("tool-button");
+thinToolButton.classList.add("tool-button", "selected-tool");
+thickToolButton.classList.add("tool-button");
+exportButton.classList.add("tool-button");
+applyStickerButton.classList.add("tool-button");
