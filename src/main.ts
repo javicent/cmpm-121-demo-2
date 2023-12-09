@@ -293,3 +293,32 @@ applyStickerButton.addEventListener("click", () => {
 });
 
 app.appendChild(applyStickerButton);
+
+const exportButton = document.createElement("button");
+exportButton.textContent = "Export";
+exportButton.addEventListener("click", () => {
+  exportDrawing();
+});
+
+app.appendChild(exportButton);
+
+function exportDrawing() {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+  const exportCtx = exportCanvas.getContext("2d");
+
+  exportCtx.scale(4, 4);
+
+  for (const item of displayList) {
+    if (!(item instanceof ToolPreview)) {
+      item.display(exportCtx);
+    }
+  }
+
+  const dataURL = exportCanvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = dataURL;
+  a.download = "exported_drawing.png";
+  a.click();
+}
