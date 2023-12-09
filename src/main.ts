@@ -31,14 +31,37 @@ class MarkerLine {
   }
 }
 
+class ToolPreview {
+  private x: number | null = null;
+  private y: number | null = null;
+  private radius: number;
+
+  constructor(radius: number) {
+    this.radius = radius;
+  }
+
+  updatePosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (this.x !== null && this.y !== null) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.closePath();
+    }
+  }
+}
+
 const app: HTMLDivElement = document.querySelector("#app")!;
-
-const gameName = "My game";
-
-document.title = gameName;
+document.title = "My game";
 
 const header = document.createElement("h1");
-header.innerHTML = gameName;
+header.innerHTML = "My game";
 app.append(header);
 
 const canvas = document.createElement("canvas");
@@ -54,6 +77,8 @@ let displayList: Array<MarkerLine> = [];
 let undoStack: Array<MarkerLine> = [];
 let selectedLineWidth = 2;
 
+let toolPreview: ToolPreview | null = null;
+
 canvas.addEventListener("mousedown", (e) => {
   isDrawing = true;
   const x = e.clientX - canvas.offsetLeft;
@@ -64,20 +89,33 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!isDrawing) return;
   const x = e.clientX - canvas.offsetLeft;
   const y = e.clientY - canvas.offsetTop;
-  displayList[displayList.length - 1].drag(x, y);
-  const event = new Event("drawing-changed");
-  canvas.dispatchEvent(event);
+
+  if (!isDrawing) {
+    // If not drawing, update the tool preview
+    if (!toolPreview) {
+      toolPreview = new ToolPreview(selectedLineWidth);
+    }
+    toolPreview.updatePosition(x, y);
+    const toolMovedEvent = new Event("tool-moved");
+    canvas.dispatchEvent(toolMovedEvent);
+  } else {
+    // If drawing, update the last line in the display list
+    displayList[displayList.length - 1].drag(x, y);
+    const drawingChangedEvent = new Event("drawing-changed");
+    canvas.dispatchEvent(drawingChangedEvent);
+  }
 });
 
 canvas.addEventListener("mouseup", () => {
   isDrawing = false;
+  toolPreview = null;
 });
 
 canvas.addEventListener("mouseout", () => {
   isDrawing = false;
+  toolPreview = null;
 });
 
 const clearButton = document.createElement("button");
@@ -149,6 +187,17 @@ function updateToolButtonStyles() {
   }
 }
 
+// Add a listener for the "tool-moved" event to draw the tool preview
+canvas.addEventListener("tool-moved", () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const line of displayList) {
+    line.display(ctx);
+  }
+  if (toolPreview) {
+    toolPreview.draw(ctx);
+  }
+});
+
 canvas.addEventListener("drawing-changed", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const line of displayList) {
@@ -159,3 +208,73 @@ canvas.addEventListener("drawing-changed", () => {
 function clearUndoStack() {
   undoStack = [];
 }
+
+class Sticker {
+  private x: number;
+  private y: number;
+  private emoji: string;
+  private size: number;
+
+  constructor(x: number, y: number, emoji: string, size: number) {
+    this.x = x;
+    this.y = y;
+    this.emoji = emoji;
+    this.size = size;
+  }
+
+  preview(ctx: CanvasRenderingContext2D) {
+    ctx.font = `${this.size}px Arial`;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillText(this.emoji, this.x, this.y);
+  }
+
+  apply(ctx: CanvasRenderingContext2D) {
+    ctx.font = `${this.size}px Arial`;
+    ctx.fillText(this.emoji, this.x, this.y);
+  }
+
+  updatePosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+class StickerPreviewCommand {
+  private sticker: Sticker;
+  private ctx: CanvasRenderingContext2D;
+
+  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
+    this.sticker = sticker;
+    this.ctx = ctx;
+  }
+
+  execute() {
+    this.sticker.preview(this.ctx);
+  }
+}
+
+class StickerApplyCommand {
+  private sticker: Sticker;
+  private ctx: CanvasRenderingContext2D;
+
+  constructor(sticker: Sticker, ctx: CanvasRenderingContext2D) {
+    this.sticker = sticker;
+    this.ctx = ctx;
+  }
+
+  execute() {
+    this.sticker.apply(this.ctx);
+  }
+}
+
+const applyStickerButton = document.createElement("button");
+applyStickerButton.textContent = "Apply Sticker";
+applyStickerButton.addEventListener("click", () => {
+  if (selectedSticker) {
+    const applyCommand = new StickerApplyCommand(selectedSticker, ctx);
+    applyCommand.execute();
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  }
+});
+
+app.appendChild(applyStickerButton);
