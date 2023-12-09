@@ -12,9 +12,6 @@ interface StickerData {
   size: number;
 }
 
-let thinLineWidth = 3;
-let thickLineWidth = 8;
-
 const initialStickers: StickerData[] = [
   { x: 50, y: 50, emoji: "😊", size: 30 },
   { x: 100, y: 100, emoji: "🌟", size: 40 },
@@ -82,11 +79,19 @@ class ToolPreview {
     if (this.x !== null && this.y !== null) {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.strokeStyle = this.color;
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.closePath();
     }
+  }
+
+  getColor(): string {
+    return this.color;
+  }
+
+  getRotation(): number {
+    return this.rotation;
   }
 }
 
@@ -139,6 +144,13 @@ class Sticker {
       getRandomColor(),
       getRandomRotation()
     );
+  }
+  getColor(): string {
+    return this.color;
+  }
+
+  getRotation(): number {
+    return this.rotation;
   }
 }
 
@@ -239,6 +251,17 @@ canvas.addEventListener("mouseout", () => {
   toolPreview = null;
 });
 
+canvas.addEventListener("mousedown", (e) => {
+  isDrawing = true;
+  const x = e.clientX - canvas.offsetLeft;
+  const y = e.clientY - canvas.offsetTop;
+
+  const line = createMarkerLine(x, y);
+
+  displayList.push(line);
+  clearUndoStack();
+});
+
 const clearButton = document.createElement("button");
 clearButton.textContent = "Clear";
 clearButton.addEventListener("click", () => {
@@ -286,16 +309,21 @@ app.appendChild(redoButton);
 const thinToolButton = document.createElement("button");
 thinToolButton.textContent = "Thin";
 thinToolButton.addEventListener("click", () => {
-  selectedLineWidth = 2;
-  updateToolButtonStyles();
+  updateToolStyles(2);
+  randomizeToolProperties();
 });
 
 const thickToolButton = document.createElement("button");
 thickToolButton.textContent = "Thick";
 thickToolButton.addEventListener("click", () => {
-  selectedLineWidth = 5;
-  updateToolButtonStyles();
+  updateToolStyles(5);
+  randomizeToolProperties();
 });
+
+function updateToolStyles(lineWidth: number) {
+  selectedLineWidth = lineWidth;
+  updateToolButtonStyles();
+}
 
 app.appendChild(thinToolButton);
 app.appendChild(thickToolButton);
@@ -316,20 +344,25 @@ function updateToolButtonStyles() {
     stickerButton.textContent = `Sticker ${index + 1}`;
     stickerButton.id = `sticker-${index}`;
     stickerButton.addEventListener("click", () => {
-      selectedSticker = new Sticker(
-        sticker.x,
-        sticker.y,
-        sticker.emoji,
-        sticker.size,
-        currentColor,
-        currentRotation
-      );
+      selectedSticker = createSticker(sticker.x, sticker.y);
       updateToolButtonStyles();
     });
     app.appendChild(stickerButton);
   });
 }
 
+const previewStickerButton = document.createElement("button");
+previewStickerButton.textContent = "Preview Sticker";
+previewStickerButton.addEventListener("click", () => {
+  if (ctx && selectedSticker) {
+    const previewCommand = new StickerPreviewCommand(selectedSticker, ctx);
+    previewCommand.execute();
+  } else {
+    console.error("Canvas context (ctx) or selectedSticker is null.");
+  }
+});
+
+app.appendChild(previewStickerButton);
 canvas.addEventListener("tool-moved", () => {
   if (ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -462,6 +495,36 @@ function randomizeToolProperties() {
 function createToolPreview(x: number, y: number) {
   return new ToolPreview(selectedLineWidth, currentColor, currentRotation);
 }
+
+canvas.addEventListener("mousemove", (e) => {
+  const x = e.clientX - canvas.offsetLeft;
+  const y = e.clientY - canvas.offsetTop;
+
+  if (!isDrawing) {
+    if (!toolPreview) {
+      toolPreview = createToolPreview(x, y);
+    }
+    toolPreview.updatePosition(x, y);
+    const toolMovedEvent = new Event("tool-moved");
+    canvas.dispatchEvent(toolMovedEvent);
+  } else {
+    displayList[displayList.length - 1].drag(x, y);
+    const drawingChangedEvent = new Event("drawing-changed");
+    canvas.dispatchEvent(drawingChangedEvent);
+  }
+});
+
+thinToolButton.addEventListener("click", () => {
+  selectedLineWidth = 2;
+  updateToolButtonStyles();
+  randomizeToolProperties();
+});
+
+thickToolButton.addEventListener("click", () => {
+  selectedLineWidth = 5;
+  updateToolButtonStyles();
+  randomizeToolProperties();
+});
 
 canvas.classList.add("canvas-style");
 clearButton.classList.add("tool-button");
