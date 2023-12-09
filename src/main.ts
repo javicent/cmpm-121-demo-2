@@ -492,19 +492,21 @@ function randomizeToolProperties() {
   currentRotation = getRandomRotation();
 }
 
-function createToolPreview(x: number, y: number) {
+function createToolPreview() {
   return new ToolPreview(selectedLineWidth, currentColor, currentRotation);
 }
 
+let x: number;
+let y: number;
+
 canvas.addEventListener("mousemove", (e) => {
-  const x = e.clientX - canvas.offsetLeft;
-  const y = e.clientY - canvas.offsetTop;
+  x = e.clientX - canvas.offsetLeft;
+  y = e.clientY - canvas.offsetTop;
 
   if (!isDrawing) {
     if (!toolPreview) {
-      toolPreview = createToolPreview(x, y);
+      toolPreview = createToolPreview();
     }
-    toolPreview.updatePosition(x, y);
     const toolMovedEvent = new Event("tool-moved");
     canvas.dispatchEvent(toolMovedEvent);
   } else {
